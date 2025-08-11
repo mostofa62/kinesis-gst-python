@@ -1,8 +1,11 @@
-FROM ubuntu:20.04
+# =============================
+# 1️⃣ Build stage
+# =============================
+FROM ubuntu:20.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies including Python + GStreamer Python bindings
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     git cmake build-essential \
     curl unzip libssl-dev \
@@ -14,35 +17,61 @@ RUN apt-get update && apt-get install -y \
     gstreamer1.0-plugins-ugly \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev \
+    pkg-config \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt
+
+# Clone AWS Kinesis Video Streams C++ SDK
+RUN git clone --recursive https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
+
+# Build only the GStreamer plugin
+WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp
+RUN mkdir -p build
+WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp/build
+RUN cmake .. -DBUILD_GSTREAMER_PLUGIN=ON -DBUILD_DEPENDENCIES=ON -DBUILD_TEST=OFF
+RUN make -j2
+
+# =============================
+# 2️⃣ Runtime stage
+# =============================
+FROM ubuntu:20.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install only runtime dependencies (Python + GStreamer runtime libs)
+RUN apt-get update && apt-get install -y \
     python3 python3-pip python3-venv \
     python3-gi gir1.2-gstreamer-1.0 \
-    pkg-config \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 \
+    libcurl4 \
     ca-certificates \
     awscli \
     && rm -rf /var/lib/apt/lists/*
 
-
 WORKDIR /opt
 
-# Clone the C++ SDK
-RUN git clone --recursive https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
+# Copy AWS plugin & libs from build stage
+COPY --from=build /opt/amazon-kinesis-video-streams-producer-sdk-cpp/build /opt/amazon-kinesis-video-streams-producer-sdk-cpp/build
+COPY --from=build /opt/amazon-kinesis-video-streams-producer-sdk-cpp/open-source/local/lib /opt/amazon-kinesis-video-streams-producer-sdk-cpp/open-source/local/lib
 
-WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp
-
-# Build the GStreamer plugin only
-RUN mkdir -p build && cd build && \
-    cmake .. -DBUILD_GSTREAMER_PLUGIN=ON -DBUILD_DEPENDENCIES=ON -DBUILD_TEST=OFF && \
-    make -j$(nproc)
-
-# Set environment for GStreamer to find AWS plugin & libraries
+# Set environment variables so GStreamer finds the AWS plugin
 ENV GST_PLUGIN_PATH=/opt/amazon-kinesis-video-streams-producer-sdk-cpp/build
 ENV LD_LIBRARY_PATH=/opt/amazon-kinesis-video-streams-producer-sdk-cpp/open-source/local/lib
 
-# Copy Python test script into container
-COPY test_gstreamer.py /opt/test_gstreamer.py
+# Copy Python GStreamer test script
+#COPY test_gstreamer.py /opt/test_gstreamer.py
+COPY main.py /opt/main.py
 
-# Run the test during build
-RUN python3 /opt/test_gstreamer.py
+ENV GST_DEBUG=kvssink:5,rtsp*:5
 
-# Default to Python REPL
-CMD ["python3"]
+
+ENTRYPOINT ["python3", "/opt/main.py"]
+CMD []
