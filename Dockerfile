@@ -56,6 +56,13 @@ RUN apt-get update && apt-get install -y \
     awscli \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python packages
+RUN pip3 install --no-cache-dir \
+    gql[requests] \
+    requests \
+    boto3 \
+    opencv-python-headless
+
 WORKDIR /opt
 
 # Copy AWS plugin & libs from build stage
@@ -68,7 +75,7 @@ ENV LD_LIBRARY_PATH=/opt/amazon-kinesis-video-streams-producer-sdk-cpp/open-sour
 
 # Copy Python GStreamer test script
 #COPY test_gstreamer.py /opt/test_gstreamer.py
-COPY main.py /opt/main.py
+COPY main_with_threading.py /opt/main.py
 
 ENV GST_DEBUG=kvssink:5,rtsp*:5
 
