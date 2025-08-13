@@ -77,8 +77,24 @@ ENV LD_LIBRARY_PATH=/opt/amazon-kinesis-video-streams-producer-sdk-cpp/open-sour
 #COPY test_gstreamer.py /opt/test_gstreamer.py
 COPY main_with_threading.py /opt/main.py
 
-ENV GST_DEBUG=kvssink:5,rtsp*:5
+# Copy the log configuration one directory above the plugin
+COPY kvs_log_configuration /opt/kvs_log_configuration
 
+# Make sure it's readable
+RUN chmod 644 /opt/kvs_log_configuration
+
+
+
+ENV PYTHONUNBUFFERED=1
+#ENV AWS_KVS_LOG_LEVEL=2
+ENV AWS_KVS_LOG_LEVEL=0
+#ENV GST_DEBUG=kvssink:5
+
+#ENV GST_DEBUG=kvssink:5,rtsp*:5
+# Completely suppress GStreamer debug output
+ENV GST_DEBUG=0
+ENV KVS_LOG_LEVEL=ERROR
+ENV KVS_LOG_CONFIGURATION_FILE=/opt/kvs_log_configuration
 
 ENTRYPOINT ["python3", "/opt/main.py"]
 CMD []

@@ -1,0 +1,4 @@
+log4cplus.rootLogger=ERROR, stdout
+log4cplus.appender.stdout=log4cplus::ConsoleAppender
+log4cplus.appender.stdout.layout=log4cplus::PatternLayout
+log4cplus.appender.stdout.layout.ConversionPattern=%d [%t] %-5p %c - %m%n
