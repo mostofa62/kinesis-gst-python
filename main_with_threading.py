@@ -83,15 +83,29 @@ pipeline_stop_event = threading.Event()
 def run_pipeline():
     Gst.init(None)
 
+    # pipeline_str = (
+    #     f"rtspsrc location={RTSP_URI} protocols=tcp latency=500 short-header=true name=src ! "
+    #     "queue ! rtph265depay ! h265parse config-interval=1 ! "
+    #     f'kvssink stream-name={STREAM_NAME} storage-size=128 '
+    #     f'access-key={AWS_ACCESS_KEY_ID} '
+    #     f'secret-key={AWS_SECRET_ACCESS_KEY} '
+    #     f'aws-region={AWS_REGION} '
+    #     f'log-config="{LOG_CONFIG_PATH}"'
+    # )
+
     pipeline_str = (
-        f"rtspsrc location={RTSP_URI} protocols=tcp latency=500 short-header=true name=src ! "
-        "queue ! rtph265depay ! h265parse config-interval=1 ! "
+        f"rtspsrc location={RTSP_URI} protocols=tcp latency=200 short-header=true ! "
+        "queue max-size-buffers=2 ! rtph265depay ! h265parse ! avdec_h265 ! videoconvert ! "
+        "videoscale ! video/x-raw,width=720,height=450 ! videorate ! video/x-raw,framerate=15/1 ! "
+        "x264enc tune=zerolatency bitrate=1024 speed-preset=ultrafast byte-stream=true key-int-max=30 ! "
+        "video/x-h264,profile=baseline ! "
         f'kvssink stream-name={STREAM_NAME} storage-size=128 '
         f'access-key={AWS_ACCESS_KEY_ID} '
         f'secret-key={AWS_SECRET_ACCESS_KEY} '
         f'aws-region={AWS_REGION} '
         f'log-config="{LOG_CONFIG_PATH}"'
     )
+
 
 
     prYellow("Pipeline: " + pipeline_str)
